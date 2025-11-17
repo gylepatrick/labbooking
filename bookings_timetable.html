@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LabBooking — Timetable</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #fff;
+    --accent: #000;
+  }
+  body {
+    background: var(--bg);
+    color: var(--accent);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    padding: 24px;
+  }
+
+  .brand {
+    background: var(--accent);
+    color: var(--bg);
+    padding: 10px 16px;
+    border-radius: 6px;
+    display: inline-block;
+    font-weight: 700;
+    letter-spacing: .6px;
+  }
+
+  .page-title {
+    margin-bottom: 18px;
+  }
+
+  .timetable-card {
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  table.timetable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 14px;
+  }
+
+  table.timetable th,
+  table.timetable td {
+    border: 1px solid var(--accent);
+    padding: 6px 8px;
+    vertical-align: top;
+  }
+
+  table.timetable th {
+    background: #000;
+    color: #fff;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .time-col {
+    width: 170px;
+    font-weight: 700;
+    text-align: center;
+    background: #fff;
+  }
+
+  .slot-break {
+    background: #f2f2f2;
+    color: #000;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .booking-item {
+    border: 1px solid rgba(0,0,0,0.8);
+    border-radius: 6px;
+    padding: 6px;
+    margin-bottom: 6px;
+    background: #fff;
+  }
+
+  .booking-meta {
+    font-size: 12px;
+    color: rgba(0,0,0,0.75);
+  }
+
+  .btn-sm-delete {
+    margin-top: 6px;
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 900px) {
+    .time-col { width: 120px; font-size: 13px; }
+    table.timetable th, table.timetable td { font-size: 13px; padding:6px; }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center page-title">
+    <div>
+      <div class="brand">LABBOOKING</div>
+      <div class="mt-2">
+        <h3 class="mb-0">Computer Laboratory Booking — Timetable</h3>
+        <p class="text-muted mb-0">Fixed daily slots view (Mon → Thu)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="timetable-card">
+    <div class="table-responsive">
+      <table class="timetable">
+        <thead>
+          <tr>
+            <th class="time-col">TIME</th>
+            <th>MONDAY</th>
+            <th>TUESDAY</th>
+            <th>WEDNESDAY</th>
+            <th>THURSDAY</th>
+          </tr>
+        </thead>
+        <tbody id="tBody">
+          <!-- rows inserted by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Fixed slots
+const SLOTS = [
+  { id: 's1', label: '7:30 - 8:50', start: '07:30', end: '08:50' },
+  { id: 's2', label: '8:50 - 9:10', start: '08:50', end: '09:10', isBreak: true },
+  { id: 's3', label: '9:10 - 10:30', start: '09:10', end: '10:30' },
+  { id: 's4', label: '10:30 - 11:50', start: '10:30', end: '11:50' },
+  { id: 's5', label: '11:50 - 12:30', start: '11:50', end: '12:30', isLunch: true },
+  { id: 's6', label: '12:40 - 14:00', start: '12:40', end: '14:00' },
+  { id: 's7', label: '14:00 - 14:20', start: '14:00', end: '14:20', isBreak: true },
+  { id: 's8', label: '14:20 - 15:40', start: '14:20', end: '15:40' },
+  { id: 's9', label: '15:40 - 17:00', start: '15:40', end: '17:00' }
+];
+
+const DAYS = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY'];
+
+// Parse time string to minutes
+function parseTimeToMinutes(tstr){
+  if(!tstr) return null;
+  tstr = tstr.trim();
+  const ampmRegex = /(\d{1,2}:\d{2})\s*([AaPp]\.?[Mm]\.?)/;
+  let m = tstr.match(ampmRegex);
+  if(m){
+    let [h,mn] = m[1].split(':').map(Number);
+    let part = m[2].toLowerCase().replace(/\./g,'');
+    if(part === 'pm' && h !== 12) h+=12;
+    if(part === 'am' && h===12) h=0;
+    return h*60 + mn;
+  }
+  if(tstr.includes('-')) tstr = tstr.split('-')[0].trim();
+  if(tstr.includes('–')) tstr = tstr.split('–')[0].trim();
+  const parts = tstr.split(':');
+  if(parts.length===2){
+    let h=parseInt(parts[0],10), mn=parseInt(parts[1],10);
+    if(isNaN(h)||isNaN(mn)) return null;
+    return h*60 + mn;
+  }
+  let d = new Date('1970-01-01T'+tstr);
+  if(!isNaN(d)) return d.getHours()*60+d.getMinutes();
+  return null;
+}
+
+// Find slot index for booking time
+function findSlotForBookingTime(timeStr){
+  if(!timeStr) return null;
+  const normalized = timeStr.replace(/\u2013|\u2014/g,'-').replace(/\s+/g,' ').trim().toLowerCase();
+  for(let i=0;i<SLOTS.length;i++){
+    let slabel = SLOTS[i].label.replace(/\s+/g,' ').toLowerCase();
+    if(normalized===slabel || normalized.includes(slabel) || slabel.includes(normalized)) return i;
+  }
+  const minutes = parseTimeToMinutes(timeStr);
+  if(minutes===null) return null;
+  for(let i=0;i<SLOTS.length;i++){
+    let s = parseTimeToMinutes(SLOTS[i].start);
+    let e = parseTimeToMinutes(SLOTS[i].end);
+    if(minutes>=s && minutes<e) return i;
+  }
+  return null;
+}
+
+// Build table rows
+function buildTableRows(){
+  const tbody = document.getElementById('tBody');
+  tbody.innerHTML = '';
+  SLOTS.forEach(slot => {
+    if(slot.isBreak || slot.isLunch){
+      let tr = document.createElement('tr');
+      let tdTime = document.createElement('td');
+      tdTime.className='time-col';
+      tdTime.textContent=slot.label;
+      tr.appendChild(tdTime);
+      let tdSpan = document.createElement('td');
+      tdSpan.colSpan = 4;
+      tdSpan.className='slot-break';
+      tdSpan.innerHTML = slot.isLunch ? '<strong>LUNCH BREAK</strong>' : '<strong>BREAK</strong>';
+      tr.appendChild(tdSpan);
+      tbody.appendChild(tr);
+    } else {
+      let tr=document.createElement('tr');
+      let tdTime=document.createElement('td');
+      tdTime.className='time-col';
+      tdTime.textContent=slot.label;
+      tr.appendChild(tdTime);
+      for(let d=0;d<4;d++){
+        let td=document.createElement('td');
+        td.dataset.slotId = slot.id;
+        td.dataset.dayIndex = d;
+        td.style.minHeight='80px';
+        td.innerHTML='';
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+// Remove a booking from localStorage
+function removeBookingFromStorage(key, bookingObj){
+  try{
+    let arr = JSON.parse(localStorage.getItem(key)) || [];
+    let idx = arr.findIndex(x => (String(x.name)===String(bookingObj.name) &&
+                                 String(x.studentId)===String(bookingObj.studentId) &&
+                                 String(x.lab)===String(bookingObj.lab) &&
+                                 String(x.time)===String(bookingObj.time)));
+    if(idx!==-1){
+      arr.splice(idx,1);
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+  }catch(e){console.error(e);}
+}
+
+// Load all bookings from localStorage
+function loadAllBookings(){
+  buildTableRows();
+  for(let i=0;i<localStorage.length;i++){
+    const key = localStorage.key(i);
+    if(!key.startsWith('bookings_')) continue;
+    let raw = localStorage.getItem(key);
+    if(!raw) continue;
+    let bookings;
+    try{ bookings = JSON.parse(raw); } catch(e){ bookings=[]; }
+
+    bookings.forEach((b, idx)=>{
+      let dayIndex=0;
+      if(b.day){
+        const up=String(b.day).toUpperCase();
+        const find=DAYS.indexOf(up);
+        if(find!==-1) dayIndex=find;
+      }
+
+      const slotIndex = findSlotForBookingTime(b.time);
+      if(slotIndex===null) return;
+      const slotId = SLOTS[slotIndex].id;
+
+      const selector=`td[data-slot-id="${slotId}"][data-day-index="${dayIndex}"]`;
+      const cell = document.querySelector(selector);
+      if(!cell) return;
+
+      const bookingEl = document.createElement('div');
+      bookingEl.className='booking-item';
+      bookingEl.dataset.storageKey=key;
+      bookingEl.dataset.bookingUid=`${dayIndex}-${slotId}-${idx}-${b.studentId ?? 'x'}`;
+
+      const top = document.createElement('div');
+      top.innerHTML=`<strong>${b.lab ?? '—'}</strong> — <span class="booking-meta">${SLOTS[slotIndex].label}</span>`;
+      bookingEl.appendChild(top);
+
+      const mid = document.createElement('div');
+      mid.className='booking-meta';
+      mid.textContent=`${b.name ?? 'Unknown'} (ID: ${b.studentId ?? '—'})`;
+      bookingEl.appendChild(mid);
+
+      const delBtn = document.createElement('button');
+      delBtn.className='btn btn-outline-dark btn-sm btn-sm-delete';
+      delBtn.textContent='Delete';
+      delBtn.onclick=function(){
+        if(!confirm('Delete this booking?')) return;
+        removeBookingFromStorage(key, b);
+        bookingEl.remove();
+      };
+      bookingEl.appendChild(delBtn);
+
+      cell.appendChild(bookingEl);
+    });
+  }
+}
+
+// Initialize
+(function init(){
+  buildTableRows();
+  loadAllBookings();
+})();
+</script>
+</body>
+</html>

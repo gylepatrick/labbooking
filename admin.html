@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>LabBooking — Admin</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+:root{
+  --bg: #fff;
+  --accent: #000;
+}
+body {
+  background: var(--bg);
+  color: var(--accent);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  padding: 24px;
+}
+
+.brand {
+  background: var(--accent);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: 700;
+  letter-spacing: .6px;
+}
+
+.card {
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  padding: 18px;
+  margin-top: 30px;
+}
+
+.booking-item {
+  border: 1px solid rgba(0,0,0,0.8);
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 6px;
+  background: #fff;
+}
+
+.booking-meta {
+  font-size: 12px;
+  color: rgba(0,0,0,0.75);
+}
+
+.btn-sm-delete, .btn-sm-approve, .btn-sm-reject {
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  margin-right: 4px;
+}
+
+.status-approved { background: #d4edda; }
+.status-rejected { background: #f8d7da; }
+.status-pending { background: #fff3cd; }
+
+.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="brand">LABBOOKING — ADMIN</div>
+
+  <!-- Admin Login -->
+  <div id="loginCard" class="card">
+    <h4 class="mb-3">Admin Login</h4>
+    <div class="mb-3">
+      <label>Password</label>
+      <input type="password" id="adminPass" class="form-control">
+    </div>
+    <button class="btn btn-dark" id="loginBtn">Login</button>
+    <p class="text-danger mt-2" id="loginError"></p>
+  </div>
+
+  <!-- Booking Management -->
+  <div id="bookingCard" class="card hidden">
+    <h4 class="mb-3">Manage Bookings</h4>
+    <div id="bookingList"></div>
+    <button class="btn btn-secondary mt-3" id="logoutBtn">Logout</button>
+  </div>
+</div>
+
+<script>
+// ADMIN CONFIG
+const ADMIN_PASSWORD = "admin123"; // Change this password
+
+const loginCard = document.getElementById("loginCard");
+const bookingCard = document.getElementById("bookingCard");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const loginError = document.getElementById("loginError");
+const bookingList = document.getElementById("bookingList");
+
+loginBtn.onclick = function() {
+  const pass = document.getElementById("adminPass").value;
+  if(pass === ADMIN_PASSWORD){
+    loginCard.classList.add("hidden");
+    bookingCard.classList.remove("hidden");
+    loadBookingsAdmin();
+  } else {
+    loginError.textContent = "Incorrect password!";
+  }
+}
+
+logoutBtn.onclick = function(){
+  bookingCard.classList.add("hidden");
+  loginCard.classList.remove("hidden");
+  document.getElementById("adminPass").value = "";
+  loginError.textContent = "";
+}
+
+// Load all bookings
+function loadBookingsAdmin(){
+  bookingList.innerHTML = "";
+  let anyBookings=false;
+
+  for(let i=0;i<localStorage.length;i++){
+    const key = localStorage.key(i);
+    if(!key.startsWith("bookings_")) continue;
+    let raw = localStorage.getItem(key);
+    if(!raw) continue;
+    let bookings;
+    try{ bookings=JSON.parse(raw);}catch(e){bookings=[];}
+
+    bookings.forEach((b,idx)=>{
+      anyBookings=true;
+
+      const div = document.createElement("div");
+      div.className = "booking-item status-" + (b.status??"pending");
+      div.dataset.key = key;
+      div.dataset.index = idx;
+
+      div.innerHTML = `
+        <strong>${b.lab ?? '—'}</strong> — ${b.time ?? '—'} — ${b.date ?? '—'}
+        <div class="booking-meta">${b.name ?? 'Unknown'} (ID: ${b.studentId ?? '—'})</div>
+        <div class="mt-1">
+          <button class="btn btn-outline-success btn-sm btn-sm-approve">Approve</button>
+          <button class="btn btn-outline-danger btn-sm btn-sm-reject">Reject</button>
+          <button class="btn btn-outline-dark btn-sm btn-sm-delete">Delete</button>
+        </div>
+        <div class="booking-meta mt-1">Status: ${b.status??'Pending'}${b.comment ? " — Comment: "+b.comment : ""}</div>
+      `;
+      bookingList.appendChild(div);
+
+      // Approve
+      div.querySelector(".btn-sm-approve").onclick = function(){
+        b.status="approved";
+        delete b.comment; // remove comment if approved
+        saveBooking(key, bookings);
+        loadBookingsAdmin();
+      }
+      // Reject
+      div.querySelector(".btn-sm-reject").onclick = function(){
+        const comment = prompt("Enter rejection comment:", b.comment ?? "");
+        if(comment === null) return; // canceled
+        b.status="rejected";
+        b.comment = comment;
+        saveBooking(key, bookings);
+        loadBookingsAdmin();
+      }
+      // Delete
+      div.querySelector(".btn-sm-delete").onclick = function(){
+        if(confirm("Delete this booking?")){
+          bookings.splice(idx,1);
+          saveBooking(key, bookings);
+          loadBookingsAdmin();
+        }
+      }
+    });
+  }
+
+  if(!anyBookings){
+    bookingList.innerHTML = "<p>No bookings found.</p>";
+  }
+}
+
+function saveBooking(key, arr){
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+</script>
+</body>
+</html>

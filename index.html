@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LabBooking — Computer Laboratory Booking System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f9f9f9;
+            color: #000;
+            font-family: "Inter", sans-serif;
+        }
+
+        .navbar {
+            background: #000 !important;
+        }
+
+        .card {
+            border-radius: 12px;
+            border: 1px solid #000;
+        }
+
+        .btn-dark {
+            border-radius: 8px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 1px solid #000;
+        }
+
+        .header-text {
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark px-4 py-3">
+    <span class="navbar-brand mb-0 h1 fw-bold">LabBooking</span>
+</nav>
+
+<div class="container mt-5" style="max-width: 700px;">
+    <div class="card shadow-sm p-4">
+        <h3 class="mb-4 fw-bold text-center">Computer Laboratory Booking Form</h3>
+
+        <form id="bookingForm">
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Student Name</label>
+                <input type="text" id="studentName" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Student ID</label>
+                <input type="text" id="studentId" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Laboratory</label>
+                <select id="lab" class="form-select" required>
+                    <option value="">Select Lab</option>
+                    <option>Lab 1</option>
+                    <option>Lab 2</option>
+                    <option>Lab 3</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Date</label>
+                <input type="date" id="date" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Time Slot</label>
+                <select id="timeSlot" class="form-select" required>
+                    <option value="">Select Time Slot</option>
+                    <option>7:30 - 8:50</option>
+                    <option>9:10 - 10:30</option>
+                    <option>10:30 - 11:50</option>
+                    <option>12:40 - 14:00</option>
+                    <option>14:20 - 15:40</option>
+                    <option>15:40 - 17:00</option>
+                </select>
+            </div>
+
+            <button class="btn btn-dark w-100 py-2 mt-2">Submit Booking</button>
+        </form>
+
+        <a href="bookings.html" class="btn btn-outline-dark w-100 py-2 mt-3">View Bookings</a>
+
+    </div>
+</div>
+
+<script>
+document.getElementById("bookingForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    let name = document.getElementById("studentName").value;
+    let studentId = document.getElementById("studentId").value;
+    let lab = document.getElementById("lab").value;
+    let date = document.getElementById("date").value;
+    let time = document.getElementById("timeSlot").value;
+
+    // Determine day of week from date (MONDAY->THURSDAY)
+    const dayNames = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    const dt = new Date(date + 'T00:00:00');
+    let day = dayNames[dt.getDay()] || 'MONDAY';
+    if(['MONDAY','TUESDAY','WEDNESDAY','THURSDAY'].indexOf(day) === -1) day = 'MONDAY'; // fallback
+
+    let key = "bookings_" + date;
+
+    let existing = JSON.parse(localStorage.getItem(key)) || [];
+
+    existing.push({
+        name: name,
+        studentId: studentId,
+        lab: lab,
+        date: date,
+        day: day,
+        time: time
+    });
+
+    localStorage.setItem(key, JSON.stringify(existing));
+
+    alert("Booking saved!");
+    this.reset();
+});
+</script>
+
+</body>
+</html>
